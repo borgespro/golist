@@ -1,14 +1,22 @@
-from rest_framework import viewsets
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters
 
 from base.filters import IsOwnerFilterBackend
-from .serializers import CategorySerializer
-from .models import Category
+from base.viewsets import OwnerModelViewSet
+from products.filters import ProductFilter
+from .serializers import CategorySerializer, ProductSerializer
+from .models import Category, Product
 
 
-class CategoryViewSet(viewsets.ModelViewSet):
+class CategoryViewSet(OwnerModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     filter_backends = (IsOwnerFilterBackend, )
 
-    def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
+
+class ProductViewSet(OwnerModelViewSet):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter, IsOwnerFilterBackend)
+    filter_class = ProductFilter
+    search_fields = ('name', 'category__title')

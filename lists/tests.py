@@ -5,8 +5,8 @@ from django.contrib.auth import get_user_model
 from django.utils.datetime_safe import datetime
 from rest_framework import status
 from rest_framework.reverse import reverse
-from rest_framework.test import APITestCase
 
+from base.tests import BaseAPITest
 from products.models import Product
 from .models import List
 
@@ -45,15 +45,7 @@ class ListModelTest(TestCase):
         self.assertEqual(my_list.total_value, milk_qty * milk_price + cheese_qty * cheese_price)
 
 
-class ListAPITest(APITestCase):
-    def setUp(self):
-        self.john_lennon = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
-        self.john_lennon_token = self._get_jwt_token('john', 'johnpassword')
-
-    def _get_jwt_token(self, username, password):
-        url_login = reverse('login')
-        return self.client.post(url_login, {'username': username, 'password': password}, format='json').data['token']
-
+class ListAPITest(BaseAPITest):
     def _make_request_get_lists(self, **kwargs):
         url_lists_api = reverse('list-list')
         return self.client.get(url_lists_api, kwargs, format='json')
@@ -84,11 +76,6 @@ class ListAPITest(APITestCase):
             'The Beatles Second Album',
             'Revolver',
         ]
-
-    def _create_paul_mccartney(self):
-        self.paul_mccartney = User.objects.create_user('paul', 'mccartney@thebeatles.com', 'paulpassword',
-                                                       hash='PAULMCCARTNEYHASH')
-        self.paul_mccartney_token = self._get_jwt_token('paul', 'paulpassword')
 
     def test_create_list_with_valid_jwt_token(self):
         self.client.credentials(HTTP_AUTHORIZATION='JWT ' + self.john_lennon_token)
