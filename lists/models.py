@@ -11,9 +11,6 @@ class List(BaseModel):
     name = models.CharField(_('Name'), max_length=100)
     valid_at = models.DateTimeField(_('Valid at'), null=True)
 
-    class Meta:
-        ordering = ['name', 'owner']
-
     def _is_active(self):
         return self.valid_at > timezone.now() if self.valid_at else True
     _is_active.boolean = True
@@ -33,6 +30,12 @@ class List(BaseModel):
         return self.list_items.aggregate(quantity=Sum('quantity'))['quantity']
     products_qty = property(_get_products_qty)
 
+    class Meta:
+        ordering = ['name', 'owner']
+
+    def __str__(self):
+        return self.name
+
     def add_item(self, product, quantity):
         return Item.objects.create(list=self, product=product, quantity=quantity)
 
@@ -42,13 +45,16 @@ class Item(BaseModel):
     product = models.ForeignKey('products.Product', verbose_name=_('Product'), on_delete=models.CASCADE, null=True)
     quantity = models.FloatField(_('Quantity'), default=0)
 
-    class Meta:
-        ordering = ['created_at', ]
-
     def _get_total_price(self):
         if self.product:
             return self.product.unit_price * self.quantity
         return 0
     total_price = property(_get_total_price)
+
+    class Meta:
+        ordering = ['created_at', ]
+
+    def __str__(self):
+        return '{} ({})'.format(self.product.name, self.quantity)
 
 

@@ -13,14 +13,20 @@ class Category(BaseModel):
     class Meta:
         ordering = ['title', ]
 
+    def __str__(self):
+        return self.title
+
 
 class Product(BaseModel):
     owner = models.ForeignKey('users.User', related_name='owner_products', verbose_name=_('Owner'),
                               on_delete=models.CASCADE)
     category = models.ForeignKey('products.Category', related_name='category_products', verbose_name=_('Category'),
-                                 on_delete=models.SET_NULL, null=True)
+                                 on_delete=models.SET_NULL, null=True, blank=True)
     name = models.CharField(_('Title'), max_length=30, db_index=True)
     unit_price = models.FloatField(_('Unit Price'), default=0)
 
     class Meta:
         ordering = ['name', ]
+
+    def __str__(self):
+        return self.name
