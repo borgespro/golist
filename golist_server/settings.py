@@ -1,4 +1,6 @@
 import os
+
+import datetime
 import environ
 
 root = environ.Path(__file__) - 2
@@ -28,6 +30,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Libraries
     'rest_framework',
+    'django_filters',
 ]
 
 MIDDLEWARE = [
@@ -86,6 +89,11 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
     ),
+    'DEFAULT_PAGINATION_CLASS': 'base.pagination.StandardResultsSetPagination'
+}
+
+JWT_AUTH = {
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(seconds=6000)
 }
 
 LANGUAGE_CODE = 'pt-br'

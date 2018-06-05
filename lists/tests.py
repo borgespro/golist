@@ -3,13 +3,16 @@ from datetime import timedelta
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.utils.datetime_safe import datetime
+from rest_framework import status
+from rest_framework.reverse import reverse
+from rest_framework.test import APITestCase
 
 from products.models import Product
 from .models import List
 
 User = get_user_model()
 
-from django.db.models import Sum
+max_page_size = 10
 
 
 class ListModelTest(TestCase):
@@ -41,5 +44,173 @@ class ListModelTest(TestCase):
         self.assertEqual(my_list.products_qty, milk_qty + cheese_qty)
         self.assertEqual(my_list.total_value, milk_qty * milk_price + cheese_qty * cheese_price)
 
+
+class ListAPITest(APITestCase):
+    def setUp(self):
+        self.john_lennon = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
+        self.john_lennon_token = self._get_jwt_token('john', 'johnpassword')
+
+    def _get_jwt_token(self, username, password):
+        url_login = reverse('login')
+        return self.client.post(url_login, {'username': username, 'password': password}, format='json').data['token']
+
+    def _make_request_get_lists(self, **kwargs):
+        url_lists_api = reverse('list-list')
+        return self.client.get(url_lists_api, kwargs, format='json')
+
+    def _make_request_create_list(self, owner, name, valid_at=None):
+        url_lists_api = reverse('list-list')
+        return self.client.post(url_lists_api, {'owner': owner.id, 'name': name, 'valid_at': valid_at}, format='json')
+
+    def _make_request_delete_list(self, pk):
+        url_list_api = reverse('list-detail', kwargs={'pk': pk})
+        return self.client.delete(url_list_api)
+
+    def _make_request_update_list(self, pk, **kwargs):
+        url_list_api = reverse('list-detail', kwargs={'pk': pk})
+        return self.client.put(url_list_api, kwargs, format='json')
+
+    def _get_default_list_names(self):
+        return [
+            'Please Please Me',
+            'With the Beatles',
+            'A Hard Day`s Night',
+            'Beatles for Sale',
+            'Help!',
+            'Meet the Beatles!',
+            'The Beatles with Tony Sheridan and Guests',
+            'Rubber Soul',
+            'Yesterday and Today',
+            'The Beatles Second Album',
+            'Revolver',
+        ]
+
+    def _create_paul_mccartney(self):
+        self.paul_mccartney = User.objects.create_user('paul', 'mccartney@thebeatles.com', 'paulpassword',
+                                                       hash='PAULMCCARTNEYHASH')
+        self.paul_mccartney_token = self._get_jwt_token('paul', 'paulpassword')
+
+    def test_create_list_with_valid_jwt_token(self):
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + self.john_lennon_token)
+        response = self._make_request_create_list(self.john_lennon, 'Lennon`s Buy List')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(List.objects.count(), 1)
+
+    def test_create_list_with_invalid_jwt_token(self):
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + self.john_lennon_token[:-1])
+        response = self._make_request_create_list(self.john_lennon, 'Lennon`s Buy List')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(List.objects.count(), 0)
+
+    def test_delete_list_with_valid_jwt_token(self):
+        my_list = List.objects.create(owner=self.john_lennon, name='Lennon`s Buy List')
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + self.john_lennon_token)
+        response = self._make_request_delete_list(my_list.pk)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(List.objects.count(), 0)
+
+    def test_delete_list_with_invalid_jwt_token(self):
+        my_list = List.objects.create(owner=self.john_lennon, name='Lennon`s Buy List')
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + self.john_lennon_token[:-1])
+        response = self._make_request_delete_list(my_list.pk)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(List.objects.count(), 1)
+
+    def test_delete_list_with_other_user_token(self):
+        my_list = List.objects.create(owner=self.john_lennon, name='Lennon`s Buy List')
+        self._create_paul_mccartney()
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + self.paul_mccartney_token)
+        response = self._make_request_delete_list(my_list.pk)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(List.objects.count(), 1)
+
+    def test_update_list_with_valid_jwt_token(self):
+        my_list = List.objects.create(owner=self.john_lennon, name='Lennon`s Buy List')
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + self.john_lennon_token)
+        response = self._make_request_update_list(my_list.pk, name='Yoko`s Buy List')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(List.objects.get(pk=my_list.pk).name, 'Yoko`s Buy List')
+
+    def test_update_list_with_invalid_jwt_token(self):
+        my_list = List.objects.create(owner=self.john_lennon, name='Lennon`s Buy List')
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + self.john_lennon_token[:-1])
+        response = self._make_request_update_list(my_list.pk, name='Yoko`s Buy List')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertNotEqual(List.objects.get(pk=my_list.pk).name, 'Yoko`s Buy List')
+
+    def test_update_list_with_other_user_token(self):
+        my_list = List.objects.create(owner=self.john_lennon, name='Lennon`s Buy List')
+        self._create_paul_mccartney()
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + self.paul_mccartney_token)
+        response = self._make_request_update_list(my_list.pk, name='Yoko`s Buy List')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertNotEqual(List.objects.get(pk=my_list.pk).name, 'Yoko`s Buy List')
+
+    def test_list_lists_with_valid_jwt_token(self):
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + self.john_lennon_token)
+        for name in self._get_default_list_names():
+            self._make_request_create_list(self.john_lennon, name)
+        response = self._make_request_get_lists()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data
+        self.assertEqual(data['count'], len(self._get_default_list_names()))
+        self.assertIsNone(data['previous'])
+        self.assertIsNotNone(data['next'])
+        results = data['results']
+        self.assertEqual(len(results), max_page_size)
+
+    def test_list_lists_with_invalid_jwt_token(self):
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + self.john_lennon_token)
+        for name in self._get_default_list_names():
+            self._make_request_create_list(self.john_lennon, name)
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + self.john_lennon_token[:-1])
+        response = self._make_request_get_lists()
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_list_lists_with_other_user_token(self):
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + self.john_lennon_token)
+        for name in self._get_default_list_names():
+            self._make_request_create_list(self.john_lennon, name)
+        self._create_paul_mccartney()
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + self.paul_mccartney_token)
+        response = self._make_request_get_lists()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data
+        self.assertEqual(data['count'], 0)
+        self.assertIsNone(data['previous'])
+        self.assertIsNone(data['next'])
+        results = data['results']
+        self.assertEqual(len(results), 0)
+
+    def test_list_lists_with_searches(self):
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + self.john_lennon_token)
+        for name in self._get_default_list_names():
+            self._make_request_create_list(self.john_lennon, name)
+        search_key = 'Beatles'
+        filtered_names = list(filter(lambda _name: search_key in _name, self._get_default_list_names()))
+        response = self._make_request_get_lists(search='Beatles')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data
+        self.assertEqual(data['count'], len(filtered_names))
+        self.assertIsNone(data['previous'])
+        self.assertIsNone(data['next'])
+        results = data['results']
+        self.assertEqual(len(results), len(filtered_names))
+
+    def test_list_lists_with_ordering(self):
+        self.client.credentials(HTTP_AUTHORIZATION='JWT ' + self.john_lennon_token)
+        for name in self._get_default_list_names():
+            self._make_request_create_list(self.john_lennon, name)
+        sorted_names = sorted(self._get_default_list_names())
+        response = self._make_request_get_lists(ordering='name')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data
+        self.assertEqual(data['count'], len(self._get_default_list_names()))
+        self.assertIsNone(data['previous'])
+        self.assertIsNotNone(data['next'])
+        results = data['results']
+        self.assertEqual(len(results), max_page_size)
+        for i, result in enumerate(results):
+            self.assertEqual(result['name'], sorted_names[i])
 
 
