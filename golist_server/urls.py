@@ -15,11 +15,19 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from rest_framework_swagger.views import get_swagger_view
+
+schema_view = get_swagger_view(title='Go List Api Documentation')
+
 
 urlpatterns = [
+    path('', schema_view),
+
     path('admin/', admin.site.urls),
     # API
     path('api/users/', include('users.urls')),
     path('api/lists/', include('lists.urls')),
     path('api/products/', include('products.urls')),
+    # Docs
+    path('api-auth/', include('rest_framework.urls', namespace='rest_framework'))
 ]
