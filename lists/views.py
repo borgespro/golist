@@ -1,3 +1,4 @@
+from django.http import Http404
 from rest_framework import filters, viewsets
 
 from base.filters import IsOwnerFilterBackend
@@ -20,3 +21,10 @@ class ItemViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Item.objects.filter(list=self.kwargs['list_pk'], list__owner=self.request.user)
+
+    def perform_create(self, serializer):
+        try:
+            items_list = List.objects.get(pk=self.kwargs['list_pk'])
+            serializer.save(list=items_list)
+        except List.DoesNotExist:
+            raise Http404

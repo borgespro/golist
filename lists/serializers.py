@@ -12,7 +12,7 @@ class ListSerializer(serializers.ModelSerializer):
 
 
 class ItemSerializer(serializers.ModelSerializer):
-    product = ProductSerializer()
+    list = serializers.PrimaryKeyRelatedField(queryset=List.objects.all(), required=False)
 
     class Meta:
         model = Item

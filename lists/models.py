@@ -19,7 +19,7 @@ class List(BaseModel):
 
     def _get_total_value(self):
         return self.list_items.annotate(total_price=F('quantity') * F('product__unit_price')).aggregate(
-            total=Sum('total_price'))['total']
+            total=Sum('total_price'))['total'] or 0
     total_value = property(_get_total_value)
 
     def _get_items_qty(self):
