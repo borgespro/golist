@@ -3,7 +3,7 @@ import os
 import datetime
 import environ
 
-root = environ.Path(__file__) - 2
+root = environ.Path(__file__) - 3
 env = environ.Env(DEBUG=(bool, False), )
 
 environ.Env.read_env(env_file='{}/.env'.format(root))
